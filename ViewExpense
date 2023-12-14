@@ -1,0 +1,426 @@
+import React, { useState, useEffect } from 'react';
+import {
+  Modal,
+  Text,
+  View,
+  TextInput,
+  Image,
+  ScrollView,
+  FlatList,
+  TouchableOpacity,
+  Platform,
+  NativeModules,
+  SafeAreaView,
+} from 'react-native';
+import styles from './Styles';
+const { StatusBarManager } = NativeModules;
+import moment from 'moment-timezone';
+import { useIsFocused, useRoute } from '@react-navigation/native';
+import { Linking } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { firebaseConfig } from './config';
+import * as firebase from 'firebase';
+import 'firebase/firestore';
+import 'firebase/auth';
+
+if (!firebase.apps.length) {
+  firebase.initializeApp(firebaseConfig);
+}
+
+export default function ViewExpense({ navigation }) {
+  const [isModalVisible, setIsModalVisible] = useState(false);
+  const [selectedBillImage, setSelectedBillImage] = useState(null);
+  const [billImage, setBillImage] = useState(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [expenses, setExpenses] = useState([]);
+  const [description, setDescription] = useState('');
+  const [amount, setAmount] = useState('');
+  const [amountDue, setAmountDue] = useState({});
+  const [payer, setPayer] = useState('');
+  const [splitWith, setSplitWith] = useState('');
+  const [totalExpenses, setTotalExpenses] = useState(0);
+  const [isSortButtonDisabled, setIsSortButtonDisabled] = useState(true);
+  const [sortAsc, setSortAsc] = useState(true);
+  const route = useRoute();
+  const [selectedDate, setSelectedDate] = useState(new Date());
+  const [user, setUser] = useState(null);
+  const isFocused = useIsFocused();
+  const [userName, setUserName] = useState('');
+  const [groupedFriends, setGroupedFriends] = useState([]);
+  const [selectedGroupName, setSelectedGroupName] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState('');
+  const [selectedSubcategory, setSelectedSubcategory] = useState('');
+  const [expenseSummaryData, setExpenseSummaryData] = useState([]);
+  useEffect(() => {
+    const { splitWithFriend: incomingSplitWithFriend } = route.params || {};
+    if (incomingSplitWithFriend) {
+      setSplitWith(incomingSplitWithFriend);
+    }
+  }, [route.params, isFocused]);
+
+  useEffect(() => {
+    const fetchExpensesAndCalculateTotals = async (userId) => {
+      try {
+        const expensesRef = firebase
+          .firestore()
+          .collection('expenses')
+          .where('userId', '==', userId);
+        const expensesSnapshot = await expensesRef.get();
+        const fetchedExpenses = expensesSnapshot.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+        }));
+        setExpenses(fetchedExpenses);
+        calculateCategoryTotals(fetchedExpenses);
+        setIsSortButtonDisabled(fetchedExpenses.length === 0);
+        calculateTotalExpenses(fetchedExpenses);
+      } catch (error) {
+        console.error('Error fetching expenses:', error);
+      }
+    };
+
+    const unsubscribe = firebase.auth().onAuthStateChanged((authUser) => {
+      setUser(authUser);
+      if (authUser) {
+        fetchUserData(authUser.uid);
+        fetchExpensesAndCalculateTotals(authUser.uid);
+      }
+    });
+
+    return () => unsubscribe();
+  }, [isFocused]);
+  const fetchUserData = async (userUid) => {
+    try {
+      const userDoc = await firebase
+        .firestore()
+        .collection('users')
+        .doc(userUid)
+        .get();
+      if (userDoc.exists) {
+        const userData = userDoc.data();
+        setUserName(userData.name);
+      } else {
+        console.error('User not found');
+      }
+    } catch (error) {
+      console.error('Error fetching user data:', error);
+    }
+  };
+
+  const calculateTotalExpenses = (expensesArray) => {
+    const total = expensesArray.reduce(
+      (acc, expense) => acc + expense.amount,
+      0
+    );
+    setTotalExpenses(total);
+  };
+  const navigateToExpenseSummaryScreen = () => {
+    if (expenses.length > 0) {
+      navigation.navigate('ExpenseSummaryScreen', {
+        categoryTotals: expenseSummaryData,
+      });
+    } else {
+      alert('Expenses are not available.');
+    }
+  };
+
+  const openModal = (imageUri) => {
+    setSelectedBillImage(imageUri);
+    setIsModalVisible(true);
+  };
+
+  useEffect(() => {
+    const amounts = {};
+
+    expenses.forEach((expense) => {
+      const splitAmount = expense.amount / (expense.splitWith.length + 1);
+      amounts[expense.payer] =
+        (amounts[expense.payer] || 0) + expense.amount - splitAmount;
+
+      expense.splitWith.forEach((person) => {
+        amounts[person] = (amounts[person] || 0) - splitAmount;
+      });
+    });
+
+    setAmountDue(amounts);
+  }, [expenses]);
+
+  const shareExpense = () => {
+    const supportEmail = 'support@example.com';
+    const subject = 'Share Expense';
+    const body = 'Hello ,\n\nI would like to share an expense.';
+
+    const mailtoLink = `mailto:${supportEmail}?subject=${encodeURIComponent(
+      subject
+    )}&body=${encodeURIComponent(body)}`;
+
+    Linking.canOpenURL(mailtoLink).then((supported) => {
+      if (supported) {
+        Linking.openURL(mailtoLink);
+      } else {
+        alert(
+          'Could not open email client. Please send an email to support@example.com.'
+        );
+      }
+    });
+  };
+
+  const back = () => {
+    navigation.navigate('ExpenseScreen');
+  };
+
+  const deleteExpense = async (id) => {
+    try {
+      await firebase.firestore().collection('expenses').doc(id).delete();
+      const updatedExpenses = expenses.filter((expense) => expense.id !== id);
+      setExpenses(updatedExpenses);
+      calculateTotalExpenses(updatedExpenses);
+      setIsSortButtonDisabled(updatedExpenses.length === 0);
+      alert('Expense deleted', 'Expense has been deleted successfully!');
+    } catch (error) {
+      console.error('Error deleting expense:', error);
+    }
+  };
+  const sortExpenses = () => {
+    const sortedExpenses = expenses.slice().sort((a, b) => {
+      if (sortAsc) {
+        return a.date - b.date;
+      } else {
+        return b.date - a.date;
+      }
+    });
+    setExpenses(sortedExpenses);
+    setSortAsc(!sortAsc);
+  };
+
+  useEffect(() => {
+    const { groupedFriends: incomingGroupedFriends, selectedGroupName } =
+      route.params || {};
+    if (incomingGroupedFriends) {
+      setGroupedFriends(incomingGroupedFriends);
+      setSelectedGroupName(selectedGroupName);
+    }
+  }, [route.params]);
+
+  const AmountsDue = ({ data }) => {
+    if (Object.keys(data).length === 0) {
+      return <Text style={styles.buttonLabel}>No Amounts Due Available</Text>;
+    }
+
+    return (
+      <View style={styles.widthContainer}>
+        <Text style={styles.title}>Amounts Due</Text>
+        {Object.entries(data).map(([person, amount], index) => {
+          const amountText =
+            amount > 0
+              ? `${person} is owed $${amount.toFixed(2)}`
+              : `${person} owes $${Math.abs(amount).toFixed(2)}`;
+          return (
+            <Text key={index} style={styles.amountDueText}>
+              {amountText}
+            </Text>
+          );
+        })}
+      </View>
+    );
+  };
+
+  const filteredExpenses = expenses.filter((expense) => {
+    const description = expense.description
+      ? expense.description.toUpperCase()
+      : '';
+    const selectedCategory = expense.selectedCategory
+      ? expense.selectedCategory.toUpperCase()
+      : '';
+    const selectedSubcategory = expense.selectedSubcategory
+      ? expense.selectedSubcategory.toUpperCase()
+      : '';
+    const amount = expense.amount || '';
+    const payer = expense.payer ? expense.payer.toUpperCase() : '';
+    const splitWith = expense.splitWith
+      ? expense.splitWith.join(' ').toUpperCase()
+      : '';
+
+    const expenseData = `${description}   
+                      ${selectedCategory}
+                      ${selectedSubcategory}
+                      ${amount}   
+                      ${payer}   
+                      ${splitWith}`;
+    const searchData = searchQuery.toUpperCase();
+
+    const categoryMatches = selectedCategory.includes(searchData);
+    const subcategoryMatches = selectedSubcategory.includes(searchData);
+
+    return (
+      expenseData.indexOf(searchData) > -1 ||
+      categoryMatches ||
+      subcategoryMatches
+    );
+  });
+
+  const calculateCategoryTotals = (expensesArray) => {
+    const totalsByCategory = {};
+
+    expensesArray.forEach((expense) => {
+      const category = expense.selectedCategory;
+      const subcategory = expense.selectedSubcategory;
+
+      if (!totalsByCategory[category]) {
+        totalsByCategory[category] = {};
+      }
+
+      if (!totalsByCategory[category][subcategory]) {
+        totalsByCategory[category][subcategory] = 0;
+      }
+
+      totalsByCategory[category][subcategory] += expense.amount;
+    });
+
+    setExpenseSummaryData(totalsByCategory);
+  };
+
+  return (
+    <SafeAreaView
+      style={{
+        flex: 1,
+        paddingTop: Platform.OS === 'android' ? StatusBarManager.HEIGHT : 0,
+      }}>
+      <ScrollView >
+        <View style={styles.container}>
+          <TouchableOpacity style={styles.profile}>
+            <Ionicons
+              name="ios-person-circle-outline"
+              size={24}
+              color="#0954a5"
+            />
+            <Text style={[styles.header, styles.profileheader]}>{userName}!</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            onPress={back}
+            style={[styles.buttonCss, styles.logoutCss]}>
+            <Ionicons name="ios-arrow-back-outline" size={20} color="white" />
+            <Text style={styles.buttonTextCss}>Back</Text>
+          </TouchableOpacity>
+
+          <View style={{ marginTop: 25 }}></View>
+          <View style={[styles.widthContainer, styles.searchBarContainer]}>
+            <TextInput
+              style={styles.searchBar}
+              placeholder="Search"
+              placeholderTextColor="#999999"
+              onChangeText={(text) => setSearchQuery(text)}
+              value={searchQuery}
+            />
+          </View>
+
+          <AmountsDue data={amountDue} />
+
+          <View style={styles.widthContainer}>
+            <TouchableOpacity
+              style={styles.buttonCss}
+              onPress={navigateToExpenseSummaryScreen}>
+              <Ionicons name="ios-bar-chart-outline" size={20} color="white" />
+              <Text style={styles.buttonTextCss}>Expense Summary Report</Text>
+            </TouchableOpacity>
+
+            <Text style={styles.title}>Earlier Added Expenses</Text>
+            <TouchableOpacity
+              style={
+                isSortButtonDisabled
+                  ? [styles.buttonCss, styles.disabledCss]
+                  : styles.buttonCss
+              }
+              onPress={sortExpenses}>
+              <Ionicons name="ios-list" size={20} color="white" />
+              <Text style={styles.buttonTextCss}>{`Sort by Date ${
+                sortAsc ? 'Asc' : 'Desc'
+              }`}</Text>
+            </TouchableOpacity>
+            <FlatList
+              style={styles.expenseList}
+              data={filteredExpenses}
+              keyExtractor={(item) => item.id}
+              renderItem={({ item }) => (
+                <View style={styles.expenseItem}>
+                  <Text>Description: {item.description}</Text>
+                  <Text>Category: {item.selectedCategory}</Text>
+                  <Text>Sub Category: {item.selectedSubcategory}</Text>
+                  <Text>Amount: ${item.amount.toFixed(2)}</Text>
+                  <Text>Paid by: {item.payer}</Text>
+                  <Text>Split with: {item.splitWith.join(', ')}</Text>
+                  <Text>Date: {moment(item.date.toDate()).format('MM-DD-YYYY')}</Text>
+                  {item.billImage && (
+                    <TouchableOpacity onPress={() => openModal(item.billImage)}>
+                      <Image
+                        source={{ uri: item.billImage }}
+                        style={styles.billImage}
+                      />
+                    </TouchableOpacity>
+                  )}
+
+                  <TouchableOpacity
+                    style={styles.shareExpenseButton}
+                    onPress={shareExpense}>
+                    <Ionicons
+                      name="ios-share-outline"
+                      size={20}
+                      color="white"
+                    />
+                    <Text style={styles.shareExpenseButtonText}>
+                      Share Expense
+                    </Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={[styles.buttonCss,styles.deleteButton]}
+                    onPress={() => deleteExpense(item.id)}>
+                    <Ionicons
+                      name="ios-trash-outline"
+                      size={20}
+                      color="white"
+                    />
+                    <Text style={styles.deleteButtonText}>Delete Expense</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+            />
+            <Text style={styles.title}>
+              Total Expenses: ${totalExpenses.toFixed(2)}
+            </Text>
+          </View>
+          <Modal
+            animationType="slide"
+            transparent={true}
+            visible={isModalVisible}
+            onRequestClose={() => {
+              setIsModalVisible(!isModalVisible);
+            }}>
+            <View style={styles.centeredView}>
+              <View style={styles.modalView}>
+                {selectedBillImage && (
+                  <Image
+                    source={{ uri: selectedBillImage }}
+                    style={styles.modalImage}
+                  />
+                )}
+
+                <TouchableOpacity
+                  style={[styles.buttonCss,styles.closeCss]}
+                  onPress={() => setIsModalVisible(!isModalVisible)}>
+                  <Ionicons
+                    name="ios-close-circle-outline"
+                    size={20}
+                    color="white"
+                  />
+                  <Text style={styles.buttonTextCss}>Clear</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </Modal>
+        </View>
+      </ScrollView>
+    </SafeAreaView>
+  );
+}

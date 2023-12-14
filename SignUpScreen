@@ -1,0 +1,152 @@
+import React, { useState } from 'react';
+import {
+  View,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  Platform,
+  NativeModules,
+  SafeAreaView,
+} from 'react-native';
+import styles from "./Styles";
+const { StatusBarManager } = NativeModules;
+import { Ionicons } from '@expo/vector-icons';
+import { firebaseConfig } from './config';
+import * as firebase from 'firebase';
+import 'firebase/firestore';
+
+if (!firebase.apps.length) {
+  firebase.initializeApp(firebaseConfig); // Ensure Firebase is initialized correctly
+}
+
+export default function Signup({ navigation }) {
+  const [email, setEmail] = useState('');
+  const [name, setName] = useState('');
+  const [password, setPassword] = useState('');
+  const [password2, setPassword2] = useState('');
+
+  const login = () => {
+    navigation.navigate('LoginScreen');
+  };
+  const back = () => {
+    navigation.navigate('LoginScreen');
+  };
+
+  const handleSignup = async () => {
+ try {
+    if (name === '' || email === '' || password === '' || password2 === '') {
+        alert('Please fill in all the details!');
+        return;
+      }
+      if (password != password2) {
+        alert('Passwords does not match!');
+        return;
+      }
+    
+      const userCredential = await firebase
+        .auth()
+        .createUserWithEmailAndPassword(email, password);
+
+      await userCredential.user.sendEmailVerification();
+
+      alert('Please check your email for a verification link.');
+
+      const isEmailVerified = await waitForEmailVerification(userCredential.user);
+
+      if (isEmailVerified) {
+        const user = userCredential.user;
+        const userId = user.uid;
+
+        const db = firebase.firestore();
+        const usersCollection = db.collection('users');
+
+        await usersCollection.doc(userId).set({
+          name: name,
+          email: email,
+        });
+        alert('Signed up successfully.');
+        navigation.navigate('LoginScreen');
+      } else {
+       alert('Email verification failed', 'Please verify your email before proceeding.');
+      }
+    } catch (error) {
+      console.error('Error adding user: ', error);
+      alert('Error adding user: ' + error.message);
+    }
+  };
+
+  const waitForEmailVerification = async (user) => {
+    return new Promise((resolve) => {
+      const intervalId = setInterval(async () => {
+        await user.reload();
+        if (user.emailVerified) {
+          clearInterval(intervalId);
+          resolve(true);
+        }
+      }, 1000); 
+    });
+  };
+  return (
+    <SafeAreaView
+      style={{
+        flex: 1,
+        paddingTop: Platform.OS === 'android' ? StatusBarManager.HEIGHT : 0,
+      }}>
+      <View style={[styles.container, styles.signUpContainer]}>
+        <TouchableOpacity
+          onPress={back}
+          style={[styles.buttonCss, styles.logoutCss]}>
+          <Ionicons name="ios-arrow-back-outline" size={20} color="white" />
+          <Text style={styles.buttonTextCss}>Back</Text>
+        </TouchableOpacity>
+        <Text style={styles.title}>Sign Up</Text>
+        <TextInput
+          style={styles.loginInput}
+          placeholder="Name"
+          placeholderTextColor="#999999"
+          onChangeText={setName}
+          value={name}
+        />
+        <TextInput
+          style={styles.loginInput}
+          placeholder="Email"
+          placeholderTextColor="#999999"
+          onChangeText={setEmail}
+          value={email}
+        />
+        <TextInput
+          style={styles.loginInput}
+          placeholder="Password"
+          secureTextEntry
+          placeholderTextColor="#999999"
+          onChangeText={setPassword}
+          value={password}
+        />
+        <TextInput
+          style={styles.loginInput}
+          placeholder="Confirm Password"
+          secureTextEntry
+          placeholderTextColor="#999999"
+          onChangeText={setPassword2}
+          value={password2}
+        />
+        <View style={styles.messgaeView}>
+          <Text>Already a member?</Text>
+          <Text style={styles.link} onPress={login}>
+            Log In
+          </Text>
+        </View>
+        <TouchableOpacity style={styles.buttonCss} onPress={handleSignup}>
+          <Ionicons
+            name="ios-arrow-up-circle-outline"
+            size={24}
+            color="white"
+          />
+          <Text style={styles.buttonTextCss}>Sign up</Text>
+        </TouchableOpacity>
+      </View>
+    </SafeAreaView>
+  );
+}
+
+

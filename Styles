@@ -1,0 +1,284 @@
+import { StyleSheet } from 'react-native';
+
+export default StyleSheet.create({
+
+  container: {
+    flex: 1,
+    padding: 8,
+    backgroundColor: '#fff',
+  },
+  buttonCss: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#0954a5',
+    padding: 10,
+    borderRadius: 5,
+    marginTop: 10,
+  },
+  buttonTextCss: {
+    color: 'white',
+    marginLeft: 5,
+    fontSize: 14,
+  },
+  disabledCss: {
+    backgroundColor: '#dedede',
+  },
+  title: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    marginVertical: 8,
+    color: '#0954a5',
+  },
+
+  logoutCss: {
+    position: 'absolute',
+    top: 10,
+    right: 10,
+    marginTop: 0,
+  },
+
+  buttonLabel: {
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  billImage: {
+    width: 100,
+    height: 100,
+    marginTop: 10,
+  },
+
+ 
+  loginContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  loginInput: {
+    width: '90%',
+    borderBottomWidth: 1,
+    paddingVertical: 5,
+    marginTop: 15,
+  },
+
+  loginHeadertitle: {
+    color: '#0954a5',
+    fontSize: 40,
+    fontWeight: 'bold',
+  },
+  subHeader: {
+    color: '#abaeb8',
+    fontSize: 16,
+    marginBottom: 20,
+  },
+  messgaeView: {
+    flexDirection: 'row',
+    marginTop: 20,
+  },
+
+  link: {
+    color: '#0954a5',
+    marginBottom: 10,
+    marginStart: 5,
+    fontWeight: '700',
+    borderBottomWidth: 1,
+  },
+  forgotLink: {
+    color: '#0f67c3',
+    fontWeight: '700',
+    borderBottomWidth: 1,
+    marginTop: 10,
+    marginBottom: 10,
+    marginRight: 17,
+    alignSelf: 'flex-end',
+  },
+  forgotSubHeader: {
+    padding: 5,
+  },
+  widthContainer: {
+    width: '100%',
+  },
+
+
+  signUpContainer: {
+    alignItems: 'center',
+    paddingTop: 80,
+  },
+
+  header: {
+    color: '#0954a5',
+    fontSize: 20,
+    fontWeight: 'bold',
+    marginTop: 50,
+  },
+  mainTitle: {
+    borderBottomWidth: 1,
+  },
+  mainInput: {
+    height: 40,
+    borderColor: 'gray',
+    borderWidth: 1,
+    paddingHorizontal: 8,
+    borderRadius: 5,
+  },
+  friendItemContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: 4,
+  },
+  checkbox: {
+    marginRight: 8,
+  },
+  friendName: {
+    fontSize: 16,
+    flex: 1,
+  },
+  bellIcon: {
+    width: 26,
+    height: 26,
+  },
+  space: {
+    marginVertical: 8,
+  },
+  addexpense: {
+    marginTop: 2,
+  },
+
+  groupContainer: {
+    marginVertical: 8,
+  },
+  groupName: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginLeft: 5,
+  },
+  deleteIcon: {
+    marginRight: 8,
+  },
+  deleteButtonText: {
+    color: 'white',
+  },
+
+  
+  expenseContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  profile: {
+    flexDirection: 'row',
+    position: 'absolute',
+    top: 10,
+    left: 10,
+    marginTop: 0,
+  },
+  profileheader: {
+    fontSize: 16,
+    marginTop: 0,
+  },
+  headerImage: {
+    width: 100,
+    height: 100,
+    marginTop: 30,
+    alignItems: 'center',
+  },
+  expenseInput: {
+    width: '100%',
+    borderBottomWidth: 1,
+    marginBottom: 10,
+  },
+  inputContainer: {
+    width: '100%',
+    marginBottom: 20,
+    marginTop: 5,
+  },
+  chooseCss: {
+    width: '50%',
+  },
+  datePickerStyle: {
+    width: 200,
+    margin: 20,
+    borderRadius: 20,
+  },
+
+  expenseItem: {
+    borderBottomWidth: 1,
+    marginBottom: 10,
+    paddingVertical: 5,
+  },
+  deleteButton: {
+    backgroundColor: '#d11a2a',
+  },
+  shareExpenseButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#13652b',
+    padding: 10,
+    borderRadius: 5,
+    marginTop: 10,
+  },
+  shareExpenseButtonText: {
+    color: 'white',
+    marginLeft: 5,
+  },
+
+  amountDueText: {
+    fontSize: 16,
+    marginBottom: 5,
+  },
+  searchBarContainer: {
+    paddingTop: 50,
+  },
+  searchBar: {
+    borderWidth: 1,
+    borderRadius: 5,
+    width: '100%',
+    padding: 5,
+    marginBottom: 5,
+  },
+  centeredView: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 22,
+  },
+  modalView: {
+    backgroundColor: 'white',
+    borderRadius: 20,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  button: {
+    borderRadius: 20,
+    elevation: 2,
+  },
+  modalImage: {
+    width: 200,
+    height: 200,
+  },
+  closeCss: {
+    marginBottom: 5,
+  },
+ 
+  summaryContainer: {
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  chartView: {
+    flexDirection: 'column',
+    justifyContent: 'center',
+    alignItems: 'left',
+  },
+  keyView: { flexDirection: 'row', alignItems: 'center', marginRight: 10 },
+
+  dropdownAndroid: {
+    borderBottomWidth: 1,
+    borderRadius: 4,
+    marginVertical: 10,
+    height: 40,
+  },
+});

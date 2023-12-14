@@ -1,0 +1,134 @@
+import React, { useState, useReducer } from 'react';
+import {
+  View,
+  Text,
+  TextInput,
+  Image,
+  TouchableOpacity,
+  ActivityIndicator,
+} from 'react-native';
+import styles from './Styles';
+import splitGif from './assets/icons/split.gif';
+import { Linking } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { firebaseConfig } from './config';
+import * as firebase from 'firebase';
+import 'firebase/firestore';
+import 'firebase/auth';
+
+
+if (!firebase.apps.length) {
+  firebase.initializeApp(firebaseConfig);
+}
+
+export default function LoginScreen({ navigation }) {
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const handleLogin = async () => {
+    try {
+      setLoading(true);
+      await firebase.auth().signInWithEmailAndPassword(email, password);
+      alert('Login successful!');
+      navigation.navigate('Main', {
+        userName: firebase.auth().currentUser.email,
+      });
+    } catch (error) {
+      console.error('Error while logging in: ', error);
+      let errorMessage = 'Authentication failed. Please try again.';
+      if (
+        error.code === 'auth/user-not-found' ||
+        error.code === 'auth/wrong-password'
+      ) {
+        errorMessage = 'Invalid email or password.';
+      }
+      alert(errorMessage);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSignup = () => {
+    navigation.navigate('SignUpScreen');
+  };
+
+  const handleForgotPassword = () => {
+    navigation.navigate('ForgotPasswordScreen');
+  };
+
+  const contactSupport = () => {
+   
+    const supportEmail = 'test@example.com';
+
+    const subject = 'Need Support';
+    const body = 'Hello Support Team,\n\nI need help with the Splits app.';
+
+    const mailtoLink = `mailto:${supportEmail}?subject=${encodeURIComponent(
+      subject
+    )}&body=${encodeURIComponent(body)}`;
+
+    Linking.canOpenURL(mailtoLink).then((supported) => {
+      if (supported) {
+        Linking.openURL(mailtoLink);
+      } else {
+        alert(
+          'Could not open email client. Please send an email to support@example.com.'
+        );
+      }
+    });
+  };
+
+  return (
+    <View style={[styles.container, styles.loginContainer]}>
+      <Text style={styles.loginHeadertitle}>SplitHub</Text>
+      <Text style={styles.subHeader}>
+        A simple money split app for everyday use
+      </Text>
+      <Image source={splitGif} style={{ width: 200, height: 200 }} />
+      <TextInput
+        style={styles.loginInput}
+        placeholder="Email"
+        placeholderTextColor="#999999"
+        onChangeText={setEmail}
+        value={email}
+        accessibilityLabel="Email Input"
+      />
+      <TextInput
+        style={styles.loginInput}
+        placeholder="Password"
+        placeholderTextColor="#999999"
+        secureTextEntry
+        onChangeText={setPassword}
+        value={password}
+      />
+      <Text style={styles.forgotLink} onPress={handleForgotPassword}>
+          Forgot Password ?
+      </Text>
+      <TouchableOpacity
+        style={
+          !email || !password || loading
+            ? [styles.buttonCss, styles.disabledCss]
+            : styles.buttonCss
+        }
+        onPress={handleLogin}>
+        <Ionicons name="ios-log-in-outline" size={20} color="white" />
+        {loading ? (
+          <ActivityIndicator color="white" style={{ marginLeft: 5 }} />
+        ) : (
+          <Text style={styles.buttonTextCss}>Login</Text>
+        )}
+      </TouchableOpacity>
+      <View style={styles.messgaeView}>
+        <Text> Don't have an account?</Text>
+        <Text style={styles.link} onPress={handleSignup}>
+          Sign up
+        </Text>
+      </View>
+      <TouchableOpacity style={styles.buttonCss} onPress={contactSupport}>
+        <Ionicons name="ios-mail-outline" size={20} color="white" />
+        <Text style={styles.buttonTextCss}>Contact Support</Text>
+      </TouchableOpacity>
+    </View>
+  );
+}

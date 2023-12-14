@@ -1,0 +1,11 @@
+// firebaseConfig.js
+export const firebaseConfig = {
+  apiKey: 'AIzaSyDHElSH-H3BTvvE7mCWFLBJqXx2HSkwwlM',
+  authDomain: 'splits-29f8a.firebaseapp.com',
+  databaseURL: 'https://splits-29f8a-default-rtdb.firebaseio.com',
+  projectId: 'splits-29f8a',
+  storageBucket: 'splits-29f8a.appspot.com',
+  messagingSenderId: '318951831471',
+  appId: '1:318951831471:web:3603ebe89307e553a3e15a',
+  measurementId: 'G-V797609319',
+};

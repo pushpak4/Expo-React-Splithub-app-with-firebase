@@ -1,0 +1,498 @@
+import React, { useState, useEffect } from 'react';
+import {
+  Text,
+  View,
+  TextInput,
+  Image,
+  ScrollView,
+  TouchableOpacity,
+  Platform,
+  NativeModules,
+  SafeAreaView,
+} from 'react-native';
+import moment from 'moment-timezone';
+import styles from './Styles';
+import { Picker } from '@react-native-picker/picker';
+import split from './assets/icons/split.jpeg';
+const { StatusBarManager } = NativeModules;
+import { useIsFocused, useRoute } from '@react-navigation/native';
+import * as ImagePicker from 'expo-image-picker';
+import DatePicker from 'react-native-datepicker';
+import { Ionicons } from '@expo/vector-icons';
+import { firebaseConfig } from './config';
+import * as firebase from 'firebase';
+import 'firebase/firestore';
+import 'firebase/auth';
+
+if (!firebase.apps.length) {
+  firebase.initializeApp(firebaseConfig);
+}
+
+export default function Expense({ navigation }) {
+  const [billImage, setBillImage] = useState(null);
+  const [expenses, setExpenses] = useState([]);
+  const [description, setDescription] = useState('');
+  const [amount, setAmount] = useState('');
+  const [amountDue, setAmountDue] = useState({});
+  const [payer, setPayer] = useState('');
+  const [splitWith, setSplitWith] = useState('');
+  const [totalExpenses, setTotalExpenses] = useState(0);
+  const [isSortButtonDisabled, setIsSortButtonDisabled] = useState(true);
+  const route = useRoute();
+  const selectedFriend = route.params?.selectedFriend;
+  const [selectedDate, setSelectedDate] = useState(new Date());
+  const [user, setUser] = useState(null);
+  const isFocused = useIsFocused();
+  const [userName, setUserName] = useState('');
+  const [groupedFriends, setGroupedFriends] = useState([]);
+  const [selectedGroupName, setSelectedGroupName] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState('');
+  const [selectedSubcategory, setSelectedSubcategory] = useState('');
+  const [expenseSummaryData, setExpenseSummaryData] = useState([]);
+  useEffect(() => {
+    const { splitWithFriend: incomingSplitWithFriend } = route.params || {};
+    if (incomingSplitWithFriend) {
+      setSplitWith(incomingSplitWithFriend);
+    }
+  }, [route.params, isFocused]);
+
+  useEffect(() => {
+    const fetchExpensesAndCalculateTotals = async (userId) => {
+      try {
+        const expensesRef = firebase
+          .firestore()
+          .collection('expenses')
+          .where('userId', '==', userId);
+        const expensesSnapshot = await expensesRef.get();
+        const fetchedExpenses = expensesSnapshot.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+        }));
+        setExpenses(fetchedExpenses);
+        calculateCategoryTotals(fetchedExpenses);
+        setIsSortButtonDisabled(fetchedExpenses.length === 0);
+        calculateTotalExpenses(fetchedExpenses);
+      } catch (error) {
+        console.error('Error fetching expenses:', error);
+      }
+    };
+
+    const unsubscribe = firebase.auth().onAuthStateChanged((authUser) => {
+      setUser(authUser);
+      if (authUser) {
+        fetchUserData(authUser.uid);
+        fetchExpensesAndCalculateTotals(authUser.uid);
+      }
+    });
+
+    return () => unsubscribe();
+  }, [isFocused]);
+  const fetchUserData = async (userUid) => {
+    try {
+      const userDoc = await firebase
+        .firestore()
+        .collection('users')
+        .doc(userUid)
+        .get();
+      if (userDoc.exists) {
+        const userData = userDoc.data();
+        setUserName(userData.name);
+      } else {
+        console.error('User not found');
+      }
+    } catch (error) {
+      console.error('Error fetching user data:', error);
+    }
+  };
+
+  const calculateTotalExpenses = (expensesArray) => {
+    const total = expensesArray.reduce(
+      (acc, expense) => acc + expense.amount,
+      0
+    );
+    setTotalExpenses(total);
+  };
+
+  const addExpense = () => {
+    if (
+      description &&
+      selectedCategory &&
+      selectedSubcategory &&
+      amount &&
+      payer &&
+      splitWith &&
+      selectedDate
+    ) {
+      const newExpense = {
+        id: expenses.length.toString(),
+        description,
+        selectedCategory,
+        selectedSubcategory,
+        amount: parseFloat(amount),
+        payer,
+        splitWith:
+          splitWith.split(',').map((friend) => friend.trim()) ||
+          groupedFriends[selectedGroupName].map((friend) => friend.name),
+        billImage,
+        date: selectedDate,
+      };
+
+      firebase
+        .firestore()
+        .collection('expenses')
+        .add({
+          userId: user.uid,
+          ...newExpense,
+       
+        });
+
+      setExpenses([...expenses, newExpense]);
+      setDescription('');
+      setSelectedCategory('');
+      setSelectedSubcategory('');
+      setAmount('');
+      setPayer('');
+      setSplitWith('');
+      setBillImage(null);
+      setTotalExpenses(totalExpenses + newExpense.amount);
+      setIsSortButtonDisabled(false);
+      setSelectedDate(new Date());
+      alert('Expense Added', 'Expense has been added successfully!');
+    }
+  };
+
+  const pickImage = async () => {
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [4, 3],
+      quality: 1,
+    });
+
+    if (!result.cancelled) {
+      setBillImage(result.uri);
+    }
+  };
+
+  useEffect(() => {
+    const amounts = {};
+
+    expenses.forEach((expense) => {
+      const splitAmount = expense.amount / (expense.splitWith.length + 1);
+      amounts[expense.payer] =
+        (amounts[expense.payer] || 0) + expense.amount - splitAmount;
+
+      expense.splitWith.forEach((person) => {
+        amounts[person] = (amounts[person] || 0) - splitAmount;
+      });
+    });
+
+    setAmountDue(amounts);
+  }, [expenses]);
+
+  const clearInputFields = () => {
+    setDescription('');
+    setSelectedCategory('');
+    setSelectedSubcategory('');
+    setAmount('');
+    setPayer('');
+    setSplitWith('');
+    setBillImage(null);
+  };
+
+  const back = () => {
+    navigation.navigate('Main', {
+      userName: firebase.auth().currentUser.email,
+    });
+  };
+
+  const viewExpense = () => {
+    navigation.navigate('ViewExpense');
+  };
+
+  useEffect(() => {
+    const { groupedFriends: incomingGroupedFriends, selectedGroupName } =
+      route.params || {};
+    if (incomingGroupedFriends) {
+      setGroupedFriends(incomingGroupedFriends);
+      setSelectedGroupName(selectedGroupName);
+    }
+  }, [route.params]);
+
+  const categories = [
+    'FoodandDrinks',
+    'Transportation',
+    'Housing',
+    'Entertainment',
+    'Health',
+    'Shopping',
+    'Travel',
+    'Education',
+    'PersonalCare',
+    'Miscellaneous',
+  ];
+  const subcategories = {
+    FoodandDrinks: ['Groceries', 'Restaurants', 'Takeout', 'Coffee/Tea'],
+    Transportation: [
+      'Gas/Fuel',
+      'Public Transport',
+      'Ride-sharing (Uber, Lyft)',
+      'Parking/Tolls',
+    ],
+    Housing: [
+      'Rent/Mortgage',
+      'Utilities (Electricity, Water, Gas)',
+      'Internet/Cable',
+      'Home Maintenance',
+    ],
+    Entertainment: ['Movies', 'Concerts', 'Streaming Services', 'Hobbies'],
+    Health: [
+      'Health Insurance',
+      'Medications',
+      'Doctors Visits',
+      'Gym Memberships',
+    ],
+    Shopping: ['Clothing', 'Electronics', 'Home Goods', 'Gifts'],
+    Travel: ['Flights', 'Hotels', 'Vacation Activities', 'Travel Insurance'],
+
+    Education: ['Tuition', 'Books/Supplies', 'Courses', 'Educational Apps'],
+
+    PersonalCare: ['Haircuts', 'Toiletries', 'Spa/Salon'],
+
+    Miscellaneous: [
+      'Bank Fees',
+      'Insurance',
+      'Donations/Charity',
+      'Subscriptions',
+    ],
+  };
+
+  const handleCategoryChange = (category) => {
+    setSelectedCategory(category);
+    setSelectedSubcategory('');
+  };
+
+  const handleSubcategoryChange = (subcategory) => {
+    setSelectedSubcategory(subcategory);
+  };
+
+  const calculateCategoryTotals = (expensesArray) => {
+    const totalsByCategory = {};
+
+    expensesArray.forEach((expense) => {
+      const category = expense.selectedCategory;
+      const subcategory = expense.selectedSubcategory;
+
+      if (!totalsByCategory[category]) {
+        totalsByCategory[category] = {};
+      }
+
+      if (!totalsByCategory[category][subcategory]) {
+        totalsByCategory[category][subcategory] = 0;
+      }
+
+      totalsByCategory[category][subcategory] += expense.amount;
+    });
+
+    setExpenseSummaryData(totalsByCategory);
+  };
+
+  return (
+    <SafeAreaView
+      style={{
+        flex: 1,
+        paddingTop: Platform.OS === 'android' ? StatusBarManager.HEIGHT : 0,
+      }}>
+      <ScrollView>
+        <View style={[styles.container, styles.expenseContainer]}>
+          <TouchableOpacity style={styles.profile}>
+            <Ionicons
+              name="ios-person-circle-outline"
+              size={20}
+              color="#0954a5"
+            />
+            <Text style={[styles.header, styles.profileheader]}>
+              {userName}!
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            onPress={back}
+            style={[styles.buttonCss, styles.logoutCss]}>
+            <Ionicons name="ios-arrow-back-outline" size={16} color="white" />
+            <Text style={styles.buttonTextCss}>Back</Text>
+          </TouchableOpacity>
+
+          <Image source={split} style={styles.headerImage} />
+          <View style={styles.space} />
+          <View style={styles.inputContainer}>
+            <TextInput
+              style={styles.expenseInput}
+              placeholder="Description"
+              placeholderTextColor="#999999"
+              onChangeText={(text) => setDescription(text)}
+              value={description}
+            />
+             {categories.length > 0 && (
+            <View
+            style={Platform.select({
+          ios: styles.dropdownIOS,
+          android: styles.dropdownAndroid,
+          windows: styles.dropdownWindows,
+        })}>
+              <Picker
+                selectedValue={selectedCategory}
+                onValueChange={(itemValue) => handleCategoryChange(itemValue)}
+                >
+                 <Picker.Item label="Select category" value="" />
+                {categories.map((category) => (
+                  <Picker.Item
+                    key={category}
+                    label={category}
+                    value={category}
+                  />
+                ))}
+              </Picker>
+         
+            </View>
+                 )}
+
+             {selectedCategory && subcategories[selectedCategory] && (
+            <View
+               style={Platform.select({
+          ios: styles.dropdownIOS,
+          android: styles.dropdownAndroid,
+          windows: styles.dropdownWindows,
+        })}>
+           
+              <Picker
+                selectedValue={selectedSubcategory}
+                onValueChange={(itemValue) =>
+                  handleSubcategoryChange(itemValue)
+                }>
+                <Picker.Item label="Select subcategory" value="" />
+                {selectedCategory &&
+                  subcategories[selectedCategory].map((subcategory) => (
+                    <Picker.Item
+                      key={subcategory}
+                      label={subcategory}
+                      value={subcategory}
+                    />
+                  ))}
+              </Picker>
+            
+            </View>
+            )}
+            <View style={{ marginVertical: 5 }}></View>
+            <TextInput
+              style={styles.expenseInput}
+              placeholder="Amount"
+              placeholderTextColor="#999999"
+              onChangeText={(text) => setAmount(text.replace(/[^0-9.]/g, ''))}
+              value={amount}
+            />
+            <TextInput
+              style={styles.expenseInput}
+              placeholder="Payer"
+              placeholderTextColor="#999999"
+              onChangeText={(text) => setPayer(text)}
+              value={selectedFriend || payer}
+            />
+            <TextInput
+              style={styles.expenseInput}
+              placeholder="Split With "
+              placeholderTextColor="#999999"
+              onChangeText={(text) => setSplitWith(text)}
+              value={
+                splitWith ||
+                (groupedFriends[selectedGroupName] &&
+                  groupedFriends[selectedGroupName]
+                    .map((friend) => friend.name)
+                    .join(', '))
+              }
+            />
+            <View>
+              <Text style={styles.buttonLabel}>
+                Pick a bill image to upload
+              </Text>
+              <TouchableOpacity
+                style={[styles.buttonCss, styles.chooseCss]}
+                onPress={pickImage}>
+                <Ionicons name="ios-image-outline" size={20} color="white" />
+                <Text style={styles.buttonTextCss}>Choose file</Text>
+              </TouchableOpacity>
+              <View style={{ alignItems: 'center' }}>
+                {billImage && (
+                  <Image source={{ uri: billImage }} style={styles.billImage} />
+                )}
+                {/* ... other input fields */}
+              </View>
+            </View>
+
+            <DatePicker
+              style={styles.datePickerStyle}
+              date={selectedDate}
+              mode="date"
+              placeholder="Select date"
+              format="MM-DD-YYYY"
+              minDate="01-01-2016"
+              maxDate="12-13-2023"
+              confirmBtnText="Confirm"
+              cancelBtnText="Cancel"
+              customStyles={{
+                dateIcon: {
+                  position: 'absolute',
+                  left: 0,
+                  top: 4,
+                  marginLeft: 0,
+                },
+                dateInput: {
+                  marginLeft: 36,
+                },
+              }}
+              onDateChange={(date) => {
+                const formattedDate = moment(date, 'MM-DD-YYYY').format(
+                  'YYYY-MM-DD'
+                );
+                console.log('Selected Date:', formattedDate);
+                const selectedDate = moment
+                  .tz(formattedDate, 'America/New_York')
+                  .toDate();
+
+                setSelectedDate(selectedDate);
+              }}
+            />
+            <TouchableOpacity
+              style={
+                !description &&
+                !selectedCategory &&
+                !selectedSubcategory &&
+                !amount &&
+                !payer &&
+                !splitWith &&
+                !selectedFriend
+                  ? [styles.buttonCss, styles.disabledCss]
+                  : styles.buttonCss
+              }
+              onPress={clearInputFields}>
+              <Ionicons
+                name="ios-remove-circle-outline"
+                size={20}
+                color="white"
+              />
+              <Text style={styles.buttonTextCss}>Clear</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.buttonCss} onPress={addExpense}>
+              <Ionicons name="ios-add-circle-outline" size={20} color="white" />
+              <Text style={styles.buttonTextCss}>Add Expense</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.buttonCss} onPress={viewExpense}>
+              <Ionicons name="ios-eye-outline" size={20} color="white" />
+              <Text style={styles.buttonTextCss}>View Expense</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </ScrollView>
+    </SafeAreaView>
+  );
+}

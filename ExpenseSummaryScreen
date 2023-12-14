@@ -1,0 +1,97 @@
+import React, { useState, useEffect } from 'react';
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  ScrollView,
+  Platform,
+  NativeModules,
+  SafeAreaView,
+} from 'react-native';
+import styles from "./Styles";
+import { Ionicons } from '@expo/vector-icons';
+const { StatusBarManager } = NativeModules;
+import CustomPieChart from './CustomPieChart'; 
+import { firebaseConfig } from './config';
+
+export default function ExpenseSummaryScreen({ route, navigation }) {
+  const { categoryTotals } = route.params;
+  const back = () => {
+    navigation.navigate('ViewExpense');
+  };
+
+  const [chartData, setChartData] = useState([]);
+
+  useEffect(() => {
+    const calculateChartData = () => {
+      const data = [];
+
+      for (const category in categoryTotals) {
+        for (const subcategory in categoryTotals[category]) {
+          const totalAmount = categoryTotals[category][subcategory];
+          data.push({
+            name: `${category} - ${subcategory}`,
+            amount: totalAmount,
+            color: getRandomColor(),
+          });
+        }
+      }
+
+      setChartData(data);
+    };
+
+    calculateChartData();
+  }, [categoryTotals]);
+
+  const getRandomColor = () => {
+    const letters = '0123456789ABCDEF';
+    let color = '#';
+    for (let i = 0; i < 6; i++) {
+      color += letters[Math.floor(Math.random() * 16)];
+    }
+    return color;
+  };
+  const fetchUserData = async (userUid) => {
+    try {
+      const userDoc = await firebase
+        .firestore()
+        .collection('users')
+        .doc(userUid)
+        .get();
+      if (userDoc.exists) {
+        const userData = userDoc.data();
+        setUserName(userData.name);
+      } else {
+        console.error('User not found');
+      }
+    } catch (error) {
+      console.error('Error fetching user data:', error);
+    }
+  };
+
+  return (
+    <SafeAreaView
+      style={{
+        flex: 1,
+        paddingTop: Platform.OS === 'android' ? StatusBarManager.HEIGHT : 0,
+      }}>
+      <ScrollView contentContainerStyle={styles.container}>
+        <View style={[styles.container, styles.summaryContainer]}>
+          <TouchableOpacity
+            onPress={back}
+            style={[styles.buttonCss, styles.logoutCss]}>
+            <Ionicons name="ios-arrow-back-outline" size={20} color="white" />
+            <Text style={styles.buttonTextCss}>Back</Text>
+          </TouchableOpacity>
+
+          <Text style={styles.title}>Expense Summary for Category</Text>
+          {chartData.length > 0 ? (
+            <CustomPieChart chartData={chartData}/>
+          ) : (
+            <Text>No data available</Text>
+          )}
+        </View>
+      </ScrollView>
+    </SafeAreaView>
+  );
+}

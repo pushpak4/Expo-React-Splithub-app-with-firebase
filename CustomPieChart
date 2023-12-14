@@ -1,0 +1,56 @@
+import React from 'react';
+import { View, Text } from 'react-native';
+import { PieChart } from 'react-native-chart-kit';
+import styles from './Styles';
+
+const CustomPieChart = ({ chartData }) => {
+  const calculatePercentage = (value, total) => {
+    const percentage = (value / total) * 100;
+    return percentage.toFixed(2);
+  };
+
+  const totalAmount = chartData.reduce((sum, dataPoint) => sum + dataPoint.amount, 0);
+
+  const sortedChartData = chartData.slice().sort((a, b) => {
+    const percentageA = calculatePercentage(a.amount, totalAmount);
+    const percentageB = calculatePercentage(b.amount, totalAmount);
+    return parseFloat(percentageB) - parseFloat(percentageA);
+  });
+
+  return (
+    <View>
+      <PieChart
+        data={sortedChartData}
+        width={300}
+        height={200}
+        chartConfig={{
+          backgroundGradientFrom: '#1E2923',
+          backgroundGradientTo: '#08130D',
+          color: (opacity = 1) => `rgba(26, 255, 146, ${opacity})`,
+        }}
+        accessor="amount"
+        backgroundColor="transparent"
+        paddingLeft="70"
+        hasLegend={false}
+      />
+
+      <View style={styles.chartView}>
+        {sortedChartData.map((data, index) => (
+          <View key={index} style={styles.keyView}>
+            <View
+              style={{
+                width: 10,
+                height: 10,
+                marginRight: 5,
+                backgroundColor: data.color,
+              }}
+            />
+            <Text style={{ fontSize: 14 }}>{calculatePercentage(data.amount, totalAmount)}% - {data.name}</Text>
+          </View>
+        ))}
+      </View>
+    </View>
+  );
+};
+
+export default CustomPieChart;
